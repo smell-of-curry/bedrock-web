@@ -60,6 +60,8 @@ test("relay protects control and rejects cross-origin writes", async () => {
     assert.match(cookie, /HttpOnly; SameSite=Strict/);
     const headers = { Cookie: cookie.split(";")[0], Origin: base };
     assert.equal((await fetch(base + "/api/status", { method: "POST", headers })).status, 200);
+    assert.equal((await fetch(base + "/api/disconnect", { method: "POST", headers })).status, 200);
+    assert.equal((await fetch(base + "/api/status", { method: "POST", headers })).status, 200);
     assert.equal((await fetch(base + "/api/signout", { method: "POST", headers })).status, 200);
     assert.equal((await fetch(base + "/api/status", { method: "POST", headers })).status, 401);
   } finally {

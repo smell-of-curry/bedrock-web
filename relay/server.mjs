@@ -250,7 +250,6 @@ const server = http.createServer(async (req, res) => {
         exited.then(async () => {
           if (session === ownedSession) {
             session = null;
-            cookies.clear();
             await rm(dir, { recursive: true, force: true });
           }
         });
@@ -294,7 +293,8 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === "/api/disconnect" && req.method === "POST") {
       await stop();
-      cookies.clear();
+      // Disconnect ends the world, not this browser's relay access or account.
+      // Explicit sign-out revokes both.
       return json(res, 200, { ok: true });
     }
     if (url.pathname === "/api/action" && req.method === "POST") {
