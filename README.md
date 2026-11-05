@@ -2,7 +2,7 @@
 
 An experimental open-source browser client built on [go-test-bds](https://github.com/smell-of-curry/go-test-bds). A server-first launcher, a real Three.js Bedrock renderer, and a personal relay that translates browser actions into Bedrock client actions.
 
-**Status: early playable-client integration, not a complete Minecraft replacement.** The shell and relay have automated checks; gameplay has not yet been verified against a live Bedrock server. Microsoft device-code sign-in is implemented and has reached a real Microsoft challenge. A successful authenticated join has not yet been verified. A live RakNet probe on 2026-11-05 confirmed the target advertises protocol 2225 / Bedrock 1.26.60, matching the pinned client library. Public-server entries are experimental; `play.pokebedrock.com:19132` is the primary compatibility target.
+**Status: early playable-client integration, not a complete Minecraft replacement.** The shell and relay have automated checks; gameplay has not yet been verified against a live Bedrock server. Microsoft device-code sign-in is implemented and has reached a real Microsoft challenge. Microsoft sign-in succeeded in the live test, but PokéBedrock rejected the relay network with its VPN/proxy policy before spawn. The server asks affected accounts to link Discord using `/link`. No server protections were changed; world entry and gameplay remain unverified. A live RakNet probe on 2026-11-05 confirmed the target advertises protocol 2225 / Bedrock 1.26.60, matching the pinned client library. Public-server entries are experimental; `play.pokebedrock.com:19132` is the primary compatibility target.
 
 ## Run locally
 

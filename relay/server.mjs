@@ -1,3 +1,4 @@
+import { connectionError } from "./errors.mjs";
 import http from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
@@ -190,7 +191,7 @@ const server = http.createServer(async (req, res) => {
         let ready = false;
         for (let i = 0; i < (t.authentication === "xbox" ? 1200 : 240); i++) {
           if (failure || child.exitCode !== null || session !== ownedSession)
-            throw Error(failure || log || "Bedrock connection closed");
+            throw Error(failure || connectionError(log));
           try {
             const data = await (
               await fetch(`http://127.0.0.1:${controlPort}/bots`, {

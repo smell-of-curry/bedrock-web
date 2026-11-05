@@ -262,7 +262,8 @@ async function join() {
     enterWorld(selected.label);
   } catch (e) {
     $("game").hidden = true;
-    toast(e.message);
+    $("connection-error-message").textContent = e.message;
+    $("connection-error").showModal();
   } finally {
     clearInterval(statusPoll);
     $("sign-in").hidden = true;
