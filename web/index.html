@@ -125,6 +125,12 @@
           opens your relay to play.
         </p>
         <label
+          >Server authentication<select name="authentication">
+            <option value="xbox">Microsoft / Xbox sign-in</option>
+            <option value="offline">Offline — private test servers only</option>
+          </select></label
+        >
+        <label
           >Mouse sensitivity<input
             name="sensitivity"
             type="range"
@@ -142,6 +148,20 @@
       <div class="gamebar">
         <b>BEDROCK WEB</b><span id="game-status">Connecting…</span
         ><button id="leave">Disconnect</button>
+      </div>
+      <div id="sign-in" hidden>
+        <h2>Sign in with Microsoft</h2>
+        <p>Open Microsoft's page and enter this code:</p>
+        <strong id="sign-in-code"></strong>
+        <p>
+          <a id="sign-in-link" target="_blank" rel="noreferrer"
+            >Continue to Microsoft ↗</a
+          >
+        </p>
+        <p>
+          Your password is entered only on Microsoft's website. Tokens stay in
+          your personal relay process and are discarded on disconnect.
+        </p>
       </div>
       <iframe id="world" title="Live Bedrock world" allow="fullscreen"></iframe>
       <div id="game-help">

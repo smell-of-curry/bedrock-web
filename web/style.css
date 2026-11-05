@@ -482,3 +482,36 @@ iframe {
     gap: 10px;
   }
 }
+
+select {
+  padding: 12px;
+  background: #14261d;
+  color: white;
+  border: 1px solid #6a8263;
+}
+#sign-in {
+  position: absolute;
+  z-index: 20;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(500px, 90vw);
+  padding: 30px;
+  background: #293d31;
+  border: 2px solid #a4ce79;
+  text-align: center;
+}
+#sign-in-code {
+  font: 32px monospace;
+  letter-spacing: 5px;
+}
+#sign-in p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+#sign-in-link {
+  display: inline-block;
+  padding: 15px;
+  background: #87c755;
+  color: #142714;
+}

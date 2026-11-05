@@ -1,5 +1,10 @@
 export function target(value) {
-  const { host, port = 19132, name = "WebPlayer" } = value ?? {};
+  const {
+    host,
+    port = 19132,
+    name = "WebPlayer",
+    authentication = "xbox",
+  } = value ?? {};
   if (
     typeof host !== "string" ||
     host.length > 253 ||
@@ -16,7 +21,10 @@ export function target(value) {
     throw Error(
       "Player name must contain 1–16 letters, numbers, spaces or underscores.",
     );
+  if (!["xbox", "offline"].includes(authentication))
+    throw Error("Invalid authentication mode");
   return {
+    authentication,
     host,
     port: Number(port),
     name,

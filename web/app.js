@@ -10,6 +10,7 @@ let settings = {
   name: "WebPlayer",
   relay: location.origin,
   sensitivity: 0.15,
+  authentication: "xbox",
   ...load("bw-settings", {}),
 };
 let saved = load("bw-servers", []);
@@ -18,6 +19,14 @@ let key = sessionStorage.getItem("bw-key") || "",
   selected = null,
   active = false;
 const directory = [
+  {
+    label: "PokéBedrock",
+    host: "play.pokebedrock.com",
+    port: 19132,
+    description:
+      "Pokémon adventures in Minecraft Bedrock. This is the primary public-server compatibility target.",
+    auth: true,
+  },
   {
     label: "The Hive",
     host: "geo.hivebedrock.network",
@@ -69,10 +78,10 @@ function select(s) {
     s.description ||
     "Connect to your own Bedrock Dedicated Server and explore its live world in your browser.";
   $("support").textContent = s.auth
-    ? "Not playable in this preview: go-test-bds does not yet supply Xbox authentication. This entry is a directory listing, not a verified connection."
-    : "Requires a compatible Bedrock server that accepts unauthenticated clients. Keep production authentication enabled; use a dedicated test server.";
-  $("join").disabled = !!s.auth;
-  $("join").textContent = s.auth ? "Sign-in not implemented" : "Join server →";
+    ? "Uses Microsoft device-code sign-in. Public-server compatibility is experimental and has not yet been verified."
+    : "Microsoft sign-in is enabled by default. Use offline mode only for a private test server that explicitly supports it.";
+  $("join").disabled = false;
+  $("join").textContent = s.auth ? "Sign in & join →" : "Join server →";
   $("remove").hidden = !!s.auth;
 }
 function render() {
@@ -157,6 +166,7 @@ $("settings-form").onsubmit = (e) => {
     name: f.get("name"),
     relay: relay.origin,
     sensitivity: Number(f.get("sensitivity")),
+    authentication: f.get("authentication"),
   };
   key = f.get("key");
   localStorage.setItem("bw-settings", JSON.stringify(settings));
@@ -183,7 +193,7 @@ async function api(path, data) {
   return result;
 }
 async function join() {
-  if (!selected || selected.auth) return;
+  if (!selected) return;
   if (!key) {
     showSettings();
     return toast("Set your personal relay URL and access key first.");
@@ -198,12 +208,27 @@ async function join() {
   }
   $("game").hidden = false;
   $("game-status").textContent = "Connecting to " + selected.host + "…";
-  $("leave").disabled = true;
+  $("leave").disabled = false;
+  $("sign-in").hidden = true;
+  const statusPoll = setInterval(async () => {
+    try {
+      const status = await api("/api/status", {});
+      $("sign-in").hidden = !status.challenge;
+      if (status.challenge) {
+        $("sign-in-code").textContent = status.challenge.code;
+        $("sign-in-link").href = status.challenge.url;
+        $("game-status").textContent = "Waiting for Microsoft sign-in…";
+      }
+    } catch {
+      /* The connect request reports the final error. */
+    }
+  }, 1000);
   try {
     await api("/api/connect", {
       host: selected.host,
       port: selected.port,
       name: settings.name,
+      authentication: selected.auth ? "xbox" : settings.authentication,
     });
     active = true;
     $("game-status").textContent = selected.label;
@@ -215,6 +240,8 @@ async function join() {
     $("game").hidden = true;
     toast(e.message);
   } finally {
+    clearInterval(statusPoll);
+    $("sign-in").hidden = true;
     $("leave").disabled = false;
   }
 }

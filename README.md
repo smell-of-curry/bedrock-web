@@ -2,7 +2,7 @@
 
 An experimental open-source browser client built on [go-test-bds](https://github.com/smell-of-curry/go-test-bds). A server-first launcher, a real Three.js Bedrock renderer, and a personal relay that translates browser actions into Bedrock client actions.
 
-**Status: early playable-client integration, not a complete Minecraft replacement.** The shell and relay have automated checks; gameplay has not yet been verified against a live Bedrock server. Featured-server authentication is not implemented. Directory entries are explicitly disabled rather than pretending to connect.
+**Status: early playable-client integration, not a complete Minecraft replacement.** The shell and relay have automated checks; gameplay has not yet been verified against a live Bedrock server. Microsoft device-code sign-in is implemented and has reached a real Microsoft challenge. A successful authenticated join has not yet been verified. Public-server entries are experimental; `play.pokebedrock.com:19132` is the primary compatibility target.
 
 ## Run locally
 
@@ -15,7 +15,9 @@ npm run build
 npm start
 ```
 
-Open `http://127.0.0.1:8080`. Copy the temporary relay key printed in the terminal into **Settings**, set your player name, then **Play → Add server**. Use a dedicated test BDS with `online-mode=false` and a protocol version compatible with the pinned upstream client. Do not disable authentication on a production server to use this preview.
+Open `http://127.0.0.1:8080`. Copy the temporary relay key printed in the terminal into **Settings**, set your player name, then **Play → Add server**. Microsoft/Xbox sign-in is the default. Choose PokéBedrock or add a public server, press **Sign in & join**, then complete the displayed device-code flow on Microsoft’s website with your Minecraft account. The game uses your authenticated Xbox gamertag; the player-name setting is used only for offline test identities. For private tests only, select **Offline** in Settings and use a compatible BDS that already accepts unauthenticated clients. Do not disable production authentication.
+
+The sign-in access/refresh tokens stay in the Go child process; they are not persisted or returned to the browser. A fresh connection currently requires sign-in again. The access key protects the device-code status endpoint.
 
 The first connection downloads the upstream vanilla resource baseline into `.cache/`; packs supplied by the server are accepted. This can take time. No proprietary game assets are committed to this repository.
 
@@ -23,7 +25,7 @@ The first connection downloads the upstream vanilla resource baseline into `.cac
 
 - Original voxel landscape, main menu and server-only Play screen.
 - Add/remove custom servers, persisted locally; player and relay settings.
-- A sample public-server directory, with honest Xbox-authentication gating.
+- A sample public-server directory led by PokéBedrock, with Microsoft device-code authentication.
 - Pinned upstream renderer: live chunks, entities, textures, HUD and resource packs.
 - Personal relay: real Go client startup, readiness polling, disconnect and process cleanup.
 - Keyboard/mouse controls routed through the upstream instruction API: WASD, mouse look, Space jump, Shift sneak, 1–9 hotbar, T chat, left click break and right click use/place.
@@ -42,11 +44,11 @@ GitHub Pages deployment uses `.github/workflows/pages.yml`. Select **GitHub Acti
 
 ## Controls and current limitations
 
-Click inside the world to lock the pointer. Escape releases it. Disconnect ends the Go process. The relay stays connected if you close the tab; reopen it with your access key to disconnect, or restart the relay.
+Click inside the world to lock the pointer. Escape releases it. Disconnect ends the Go process. The relay stays connected if you close the tab; restart the relay to clear an abandoned session. Disconnect also cancels pending sign-in.
 
 This is not feature parity with Bedrock. Remaining work includes:
 
-- Xbox/Microsoft device sign-in, per-user token lifecycle, and real featured-server compatibility tests.
+- Real authenticated public-server compatibility tests; optional secure remembered sign-in and a user-controlled sign-out lifecycle.
 - Full survival/creative inventory interaction, crafting, combat, container screens and interactive server forms.
 - Touch/gamepad input, sound, accessibility and rendering/performance parity.
 - Continuous input delivery tied to server ticks rather than request latency, pitch limits, and latency prediction/reconciliation.
@@ -63,6 +65,8 @@ npm test
 npm run build
 npm start
 ```
+
+`scripts/build-runner.mjs` copies only upstream runner source into ignored `.build/runner/` and injects the small `relay/authentication.go.txt` hook. It builds against the unmodified upstream module. The injection checks its anchor and fails if an upstream change requires review. Upstream source is not modified or committed here.
 
 `upstream/` is a Git submodule pinned to `2484855c74e36076317beaf511982a922162ae1b`. Local uncommitted changes in another checkout are not included. Update the pin deliberately, then rebuild and retest the protocol, renderer and control API together. Build outputs, cache, logs and credentials are ignored.
 

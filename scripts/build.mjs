@@ -19,8 +19,4 @@ await cp(
   resolve(root, "dist/renderer"),
   { recursive: true },
 );
-run(
-  "go",
-  ["build", "-o", resolve(root, ".build/gotestbds"), "."],
-  resolve(root, "upstream"),
-);
+await import("./build-runner.mjs");

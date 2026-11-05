@@ -87,6 +87,12 @@ const server = http.createServer(async (req, res) => {
       return json(res, 401, {
         error: "Enter your relay access key in Settings.",
       });
+    if (url.pathname === "/api/status")
+      return json(res, 200, {
+        connecting,
+        connected: !!session && !connecting,
+        challenge: session?.challenge || null,
+      });
     if (url.pathname === "/api/connect" && req.method === "POST") {
       if (connecting || session)
         return json(res, 409, {
@@ -117,13 +123,37 @@ const server = http.createServer(async (req, res) => {
         const child = spawn(resolve(root, ".build/gotestbds"), args, {
           cwd: dir,
           stdio: ["ignore", "pipe", "pipe"],
-          env: { ...process.env, GOTESTBDS_CONTROL_TOKEN: "" },
+          env: {
+            ...process.env,
+            GOTESTBDS_CONTROL_TOKEN: "",
+            BEDROCK_WEB_AUTH: t.authentication,
+          },
         });
         let log = "",
           failure = "";
         for (const s of [child.stdout, child.stderr])
           s.on("data", (b) => {
             log = (log + b).slice(-3000);
+            const match = log.match(
+              /Authenticate at (https:\/\/[^\s]+) using the code ([A-Z0-9-]+)\./,
+            );
+            if (match && session?.child === child) {
+              const uri = new URL(match[1]);
+              if (
+                [
+                  "www.microsoft.com",
+                  "microsoft.com",
+                  "login.live.com",
+                  "aka.ms",
+                ].includes(uri.hostname)
+              )
+                session.challenge = { url: uri.href, code: match[2] };
+            }
+            if (
+              log.includes("Authentication successful.") &&
+              session?.child === child
+            )
+              session.challenge = null;
           });
         const exited = new Promise((r) => {
           child.on("exit", r);
@@ -142,8 +172,8 @@ const server = http.createServer(async (req, res) => {
           }
         });
         let ready = false;
-        for (let i = 0; i < 120; i++) {
-          if (failure || child.exitCode !== null)
+        for (let i = 0; i < (t.authentication === "xbox" ? 1200 : 240); i++) {
+          if (failure || child.exitCode !== null || session !== ownedSession)
             throw Error(failure || log || "Bedrock connection closed");
           try {
             const data = await (
@@ -151,7 +181,9 @@ const server = http.createServer(async (req, res) => {
                 signal: AbortSignal.timeout(500),
               })
             ).json();
-            if (data.bots?.some((b) => b.name === t.name && b.online)) {
+            const online = data.bots?.find((b) => b.online);
+            if (online) {
+              session.name = online.name;
               ready = true;
               break;
             }
@@ -160,7 +192,7 @@ const server = http.createServer(async (req, res) => {
         }
         if (!ready)
           throw Error(
-            "Server did not accept the connection within 60 seconds. Check address, protocol version and server authentication.",
+            "Server did not accept the connection before the connection deadline. Check address, protocol version and server authentication.",
           );
         const cookie = randomBytes(24).toString("hex");
         cookies.clear();
@@ -169,7 +201,7 @@ const server = http.createServer(async (req, res) => {
           "Set-Cookie",
           `bedrock=${cookie}; HttpOnly; SameSite=Strict; Path=/${req.headers["x-forwarded-proto"] === "https" ? "; Secure" : ""}`,
         );
-        return json(res, 200, { name: t.name });
+        return json(res, 200, { name: session.name });
       } catch (e) {
         await stop();
         throw e;
@@ -178,8 +210,6 @@ const server = http.createServer(async (req, res) => {
       }
     }
     if (url.pathname === "/api/disconnect" && req.method === "POST") {
-      if (connecting)
-        return json(res, 409, { error: "Connection in progress" });
       await stop();
       cookies.clear();
       return json(res, 200, { ok: true });

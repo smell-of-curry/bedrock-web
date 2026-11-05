@@ -1,0 +1,21 @@
+package main
+
+import (
+    "context"
+    "io"
+    "os"
+
+    "github.com/sandertv/gophertunnel/minecraft"
+    "github.com/sandertv/gophertunnel/minecraft/auth"
+)
+
+// configureWebAuthentication adds an opt-in authenticated identity to the
+// upstream test runner. Tokens stay in this child process and are never saved
+// to disk or sent to the browser. The user completes Microsoft's device flow.
+func configureWebAuthentication(ctx context.Context, dialer *minecraft.Dialer) error {
+    if os.Getenv("BEDROCK_WEB_AUTH") != "xbox" { return nil }
+    token, err := auth.RequestLiveTokenContext(ctx, os.Stdout)
+    if err != nil { return err }
+    dialer.TokenSource = auth.RefreshTokenSourceWriter(token, io.Discard)
+    return nil
+}
