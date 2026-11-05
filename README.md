@@ -66,6 +66,8 @@ npm start
 
 `upstream/` is a Git submodule pinned to `2484855c74e36076317beaf511982a922162ae1b`. Local uncommitted changes in another checkout are not included. Update the pin deliberately, then rebuild and retest the protocol, renderer and control API together. Build outputs, cache, logs and credentials are ignored.
 
+The pinned upstream build currently reports three high-severity development-dependency audit findings (Vite, nanoid and source-map-js). These are not dependencies of the Node relay; the hosted frontend is a static production bundle. Do not expose the upstream Vite development server. Updating the upstream build-tool pin and rerunning its suite remains outstanding.
+
 ## License and attribution
 
 Original code is MIT licensed; upstream remains governed by its own licensing metadata (its npm package declares ISC). Dependencies and downloaded resources retain their own terms. Review upstream licensing coverage before redistributing modified upstream source or binaries. Minecraft, Bedrock and server names belong to their respective owners. This independent project is not affiliated with Mojang or Microsoft and does not distribute Minecraft artwork or the game itself.
