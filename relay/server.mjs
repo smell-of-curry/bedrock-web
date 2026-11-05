@@ -93,6 +93,22 @@ const server = http.createServer(async (req, res) => {
         connected: !!session && !connecting,
         challenge: session?.challenge || null,
       });
+    if (url.pathname === "/api/resume" && req.method === "POST") {
+      if (!session || connecting)
+        return json(res, 409, {
+          error: connecting
+            ? "Sign-in or connection is still in progress."
+            : "No session to resume.",
+        });
+      const cookie = randomBytes(24).toString("hex");
+      cookies.clear();
+      cookies.add(cookie);
+      res.setHeader(
+        "Set-Cookie",
+        `bedrock=${cookie}; HttpOnly; SameSite=Strict; Path=/${req.headers["x-forwarded-proto"] === "https" ? "; Secure" : ""}`,
+      );
+      return json(res, 200, { name: session.name });
+    }
     if (url.pathname === "/api/connect" && req.method === "POST") {
       if (connecting || session)
         return json(res, 409, {

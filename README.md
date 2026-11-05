@@ -2,7 +2,7 @@
 
 An experimental open-source browser client built on [go-test-bds](https://github.com/smell-of-curry/go-test-bds). A server-first launcher, a real Three.js Bedrock renderer, and a personal relay that translates browser actions into Bedrock client actions.
 
-**Status: early playable-client integration, not a complete Minecraft replacement.** The shell and relay have automated checks; gameplay has not yet been verified against a live Bedrock server. Microsoft device-code sign-in is implemented and has reached a real Microsoft challenge. A successful authenticated join has not yet been verified. Public-server entries are experimental; `play.pokebedrock.com:19132` is the primary compatibility target.
+**Status: early playable-client integration, not a complete Minecraft replacement.** The shell and relay have automated checks; gameplay has not yet been verified against a live Bedrock server. Microsoft device-code sign-in is implemented and has reached a real Microsoft challenge. A successful authenticated join has not yet been verified. A live RakNet probe on 2026-11-05 confirmed the target advertises protocol 2225 / Bedrock 1.26.60, matching the pinned client library. Public-server entries are experimental; `play.pokebedrock.com:19132` is the primary compatibility target.
 
 ## Run locally
 
@@ -28,6 +28,7 @@ The first connection downloads the upstream vanilla resource baseline into `.cac
 - A sample public-server directory led by PokéBedrock, with Microsoft device-code authentication.
 - Pinned upstream renderer: live chunks, entities, textures, HUD and resource packs.
 - Personal relay: real Go client startup, readiness polling, disconnect and process cleanup.
+- Interactive server menus, yes/no dialogs, and custom forms (text, toggle, slider, dropdown and step-slider fields).
 - Keyboard/mouse controls routed through the upstream instruction API: WASD, mouse look, Space jump, Shift sneak, 1–9 hotbar, T chat, left click break and right click use/place.
 - Access-key authentication, same-origin write checks, bounded request bodies and restricted instruction names.
 - GitHub Pages deployment workflow; Node tests and a reproducible build.
@@ -44,14 +45,15 @@ GitHub Pages deployment uses `.github/workflows/pages.yml`. Select **GitHub Acti
 
 ## Controls and current limitations
 
-Click inside the world to lock the pointer. Escape releases it. Disconnect ends the Go process. The relay stays connected if you close the tab; restart the relay to clear an abandoned session. Disconnect also cancels pending sign-in.
+Click inside the world to lock the pointer. Escape releases it. Disconnect ends the Go process. The relay stays connected if you close the tab; use **Resume connection** on the home screen to return, or restart the relay to clear an abandoned session. Disconnect also cancels pending sign-in.
 
 This is not feature parity with Bedrock. Remaining work includes:
 
 - Real authenticated public-server compatibility tests; optional secure remembered sign-in and a user-controlled sign-out lifecycle.
-- Full survival/creative inventory interaction, crafting, combat, container screens and interactive server forms.
+- Full survival/creative inventory interaction, crafting, combat and container screens.
+- Pixel-faithful native form hit-testing. Menu, modal and custom forms currently use a separate accessible interaction panel over the upstream renderer.
 - Touch/gamepad input, sound, accessibility and rendering/performance parity.
-- Continuous input delivery tied to server ticks rather than request latency, pitch limits, and latency prediction/reconciliation.
+- Continuous input delivery tied to server ticks rather than request latency, latency prediction/reconciliation.
 - Live integration tests covering joining, chunk streaming, movement, block break/place, inventory, death, respawn and server transfer.
 - Multi-user isolation, quotas, disconnect expiry and target/network policy before offering a shared public relay.
 - A maintained and verified featured-server catalog. The sample directory is not the full current Bedrock featured list.

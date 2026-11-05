@@ -515,3 +515,30 @@ select {
   background: #87c755;
   color: #142714;
 }
+
+#server-form-panel {
+  position: absolute;
+  z-index: 15;
+  top: 70px;
+  bottom: 45px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(480px, 92vw);
+  height: fit-content;
+  max-height: calc(100vh - 120px);
+  overflow: auto;
+  padding: 24px;
+  background: #293d31;
+  border: 2px solid #819c70;
+}
+#server-form-panel button {
+  display: block;
+  width: 100%;
+  margin: 9px 0;
+}
+#server-form-panel input[type="checkbox"] {
+  width: auto;
+}
+#server-form-panel h2 {
+  font-size: 20px;
+}

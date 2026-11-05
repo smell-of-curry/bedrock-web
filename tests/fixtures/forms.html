@@ -1,0 +1,7 @@
+<!doctype html><html><head><title>Server form integration check</title><link rel="stylesheet" href="./style.css"></head><body><main style="padding:30px"><h1 style="font:24px sans-serif">Server form integration check</h1><select id="kind" aria-label="Fixture"><option>custom</option><option>menu</option><option>modal</option></select><pre id="result" role="status"></pre><section id="form"></section></main><script type="module">
+import {attachForms} from './forms.js';
+const fixtures={custom:{type:'custom',title:'Player options',content:[{type:'label',text:'Choose your preferences'},{type:'input',text:'Nickname',default:'Trainer'},{type:'toggle',text:'Enable music',default:true},{type:'slider',text:'Volume',min:0,max:10,step:1,default:5},{type:'dropdown',text:'Team',options:['Red','Blue'],defaultIndex:0},{type:'step_slider',text:'Difficulty',options:['Easy','Hard'],defaultIndex:0}]},menu:{type:'menu',title:'Choose a move',buttons:[{text:'Thunderbolt'},{text:'Protect'}]},modal:{type:'modal',title:'Accept battle?',button1:'Battle',button2:'Decline'}};
+let current=fixtures.custom;
+document.querySelector('#kind').onchange=e=>current=fixtures[e.target.value];
+attachForms({host:document.querySelector('#form'),releasePointer:()=>{},onError:e=>document.querySelector('#result').textContent=e.message,send:async(name,args)=>{if(name==='getForm')return {data:current};document.querySelector('#result').textContent=JSON.stringify({name,...args});current=null;return {status:'success'};}});
+</script></body></html>

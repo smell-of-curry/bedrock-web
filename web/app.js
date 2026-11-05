@@ -1,3 +1,5 @@
+import { attachForms } from "./forms.js";
+let stopForms = () => {};
 const $ = (id) => document.getElementById(id);
 function load(key, fallback) {
   try {
@@ -192,6 +194,33 @@ async function api(path, data) {
     );
   return result;
 }
+function enterWorld(label) {
+  active = true;
+  $("game").hidden = false;
+  $("game-status").textContent = label;
+  $("world").src =
+    "/renderer/index.html?stream=" +
+    encodeURIComponent(location.origin + "/stream") +
+    "&camera=first";
+}
+async function checkSession() {
+  if (!key) return;
+  try {
+    const state = await api("/api/status", {});
+    $("resume").hidden = !state.connected;
+  } catch {
+    /* A Pages launcher has no relay routes. */
+  }
+}
+$("resume").onclick = async () => {
+  try {
+    const session = await api("/api/resume", {});
+    enterWorld(session.name);
+  } catch (e) {
+    toast(e.message);
+  }
+};
+checkSession();
 async function join() {
   if (!selected) return;
   if (!key) {
@@ -230,12 +259,7 @@ async function join() {
       name: settings.name,
       authentication: selected.auth ? "xbox" : settings.authentication,
     });
-    active = true;
-    $("game-status").textContent = selected.label;
-    $("world").src =
-      "/renderer/index.html?stream=" +
-      encodeURIComponent(location.origin + "/stream") +
-      "&camera=first";
+    enterWorld(selected.label);
   } catch (e) {
     $("game").hidden = true;
     toast(e.message);
@@ -250,6 +274,8 @@ $("leave").onclick = async () => {
   try {
     await api("/api/disconnect", {});
     active = false;
+    stopForms();
+    $("resume").hidden = true;
     $("world").src = "about:blank";
     $("game").hidden = true;
   } catch (e) {
@@ -268,6 +294,15 @@ $("world").onload = () => {
     busy = false;
   const send = (name, args = {}) => api("/api/action", { name, ...args });
   const error = (e) => toast(e.message);
+  stopForms();
+  stopForms = attachForms({
+    host: $("server-form-panel"),
+    send,
+    releasePointer: () => {
+      d.exitPointerLock();
+    },
+    onError: error,
+  });
   const reset = () => {
     keys.clear();
     dx = dy = 0;
@@ -332,7 +367,11 @@ $("world").onload = () => {
     }
     if (busy || !d.pointerLockElement) return;
     busy = true;
-    const deltaRotation = [dx, dy];
+    const pitch = w.__viewerInternals?.store.getState().actor?.rot?.[1] ?? 0;
+    const deltaRotation = [
+      dx,
+      Math.max(-89.9, Math.min(89.9, pitch + dy)) - pitch,
+    ];
     dx = dy = 0;
     try {
       await send("moveRawInput", {
