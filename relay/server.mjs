@@ -146,15 +146,19 @@ const server = http.createServer(async (req, res) => {
           dir,
           "--viewer-packs",
         ];
-        const child = spawn(resolve(root, ".build/gotestbds"), args, {
-          cwd: dir,
-          stdio: ["pipe", "pipe", "pipe", "pipe"],
-          env: {
-            ...process.env,
-            GOTESTBDS_CONTROL_TOKEN: "",
-            BEDROCK_WEB_AUTH: t.authentication,
+        const child = spawn(
+          process.env.BEDROCK_RUNNER || resolve(root, ".build/gotestbds"),
+          args,
+          {
+            cwd: dir,
+            stdio: ["pipe", "pipe", "pipe", "pipe"],
+            env: {
+              ...process.env,
+              GOTESTBDS_CONTROL_TOKEN: "",
+              BEDROCK_WEB_AUTH: t.authentication,
+            },
           },
-        });
+        );
         child.stdin.on("error", () => {});
         child.stdin.end(
           JSON.stringify(
