@@ -4,7 +4,7 @@ An experimental open-source browser client built on [go-test-bds](https://github
 
 **Status: experimental integration, not a complete Minecraft replacement.** Microsoft sign-in works. The first public PokéBedrock attempt was rejected by its VPN/proxy policy; after the user followed the server's Discord-linking flow, the hub explicitly accepted the account. That attempt stalled later in the handshake, before world entry. Packet-stage diagnostics and in-memory sign-in reuse now support further debugging. Gameplay remains unverified. A live RakNet probe on 2026-11-05 confirmed protocol 2225 / Bedrock 1.26.60, matching the client. No production protections were changed.
 
-`play.pokebedrock.com:19132` is the primary compatibility target. Public-server entries are experimental. The GitHub repository builds successfully; Pages publication is currently blocked by a stale deployment lock reported by GitHub despite cancellation and configuration reset.
+`play.pokebedrock.com:19132` is the primary compatibility target. Public-server entries are experimental. The GitHub repository builds successfully and the launcher is live at https://smell-of-curry.github.io/bedrock-web/. The separate personal relay is still required to play.
 
 ## Run locally
 
