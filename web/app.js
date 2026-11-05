@@ -196,6 +196,8 @@ async function api(path, data) {
 }
 function enterWorld(label) {
   active = true;
+  $("home").hidden = true;
+  $("servers").hidden = true;
   $("game").hidden = false;
   $("game-status").textContent = label;
   $("world").src =
@@ -228,6 +230,7 @@ $("signout").onclick = async () => {
     $("world").src = "about:blank";
     $("game").hidden = true;
     $("resume").hidden = true;
+    $("home").hidden = false;
     toast("Signed out of Microsoft");
   } catch (e) {
     toast(e.message);
@@ -294,6 +297,7 @@ $("leave").onclick = async () => {
     $("resume").hidden = true;
     $("world").src = "about:blank";
     $("game").hidden = true;
+    $("home").hidden = false;
   } catch (e) {
     toast(e.message);
   }
@@ -304,10 +308,14 @@ $("world").onload = () => {
     d = w.document,
     canvas = d.getElementById("c");
   if (!canvas) return;
+  // The embedded renderer's diagnostic panel belongs to development tools.
+  const overlay = d.getElementById("overlay");
+  if (overlay) overlay.hidden = true;
   const keys = new Set();
   let dx = 0,
     dy = 0,
-    busy = false;
+    busy = false,
+    keyboardMode = false;
   const send = (name, args = {}) => api("/api/action", { name, ...args });
   const error = (e) => toast(e.message);
   stopForms();
@@ -316,12 +324,14 @@ $("world").onload = () => {
     send,
     releasePointer: () => {
       d.exitPointerLock();
+      reset();
     },
     onError: error,
   });
   const reset = () => {
     keys.clear();
     dx = dy = 0;
+    keyboardMode = false;
   };
   d.addEventListener("pointerlockchange", () => {
     if (!d.pointerLockElement) reset();
@@ -343,7 +353,8 @@ $("world").onload = () => {
       if (message) send("chat", { message }).catch(error);
       return;
     }
-    if (!d.pointerLockElement) return;
+    if (e.code === "Escape") { reset(); return; }
+    if (!d.pointerLockElement && !keyboardMode) return;
     e.preventDefault();
     keys.add(e.code);
     if (e.code === "Space" && !e.repeat) send("jump").catch(error);
@@ -353,8 +364,12 @@ $("world").onload = () => {
   d.addEventListener("keyup", (e) => keys.delete(e.code));
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
   canvas.addEventListener("mousedown", (e) => {
-    if (!d.pointerLockElement) {
-      canvas.requestPointerLock();
+    if (!d.pointerLockElement && !keyboardMode) {
+      const fallback = () => {
+        keyboardMode = true;
+        $("game-help").textContent = "Keyboard mode · WASD move · Arrow keys look · Space jump · 1–9 hotbar · T chat · Escape pause";
+      };
+      try { canvas.requestPointerLock()?.catch(fallback); } catch { fallback(); }
       return;
     }
     const hit = w.__viewer?.probe(
@@ -381,12 +396,12 @@ $("world").onload = () => {
       clearInterval(timer);
       return;
     }
-    if (busy || !d.pointerLockElement) return;
+    if (busy || (!d.pointerLockElement && !keyboardMode)) return;
     busy = true;
     const pitch = w.__viewerInternals?.store.getState().actor?.rot?.[1] ?? 0;
     const deltaRotation = [
-      dx,
-      Math.max(-89.9, Math.min(89.9, pitch + dy)) - pitch,
+      dx + 3 * (Number(keys.has("ArrowRight")) - Number(keys.has("ArrowLeft"))),
+      Math.max(-89.9, Math.min(89.9, pitch + dy + 3 * (Number(keys.has("ArrowDown")) - Number(keys.has("ArrowUp"))))) - pitch,
     ];
     dx = dy = 0;
     try {

@@ -29,6 +29,7 @@ await cp(
   resolve(root, "relay/authentication.go.txt"),
   resolve(dir, "web_authentication.go"),
 );
+await cp(resolve(root, "relay/network_test.go.txt"), resolve(dir, "web_network_test.go"));
 let mod = await readFile(resolve(dir, "go.mod"), "utf8");
 mod = mod.replace(
   "module github.com/smell-of-curry/go-test-bds",
@@ -42,3 +43,6 @@ execFileSync(
   ["build", "-mod=mod", "-o", resolve(root, ".build/gotestbds"), "."],
   { cwd: dir, stdio: "inherit" },
 );
+if (process.argv.includes("--test")) {
+  execFileSync("go", ["test", "-mod=mod", "-timeout=30s", "-run", "TestResourceSizedPayload", "."], { cwd: dir, stdio: "inherit" });
+}

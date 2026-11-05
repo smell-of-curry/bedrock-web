@@ -1,0 +1,92 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"io"
+	"log/slog"
+	"net"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/sandertv/go-raknet"
+)
+
+// Exercise the real transport through a lossy tunnel, including a fragmented
+// resource-sized payload. The proxy drops packets above a 1300-byte IP MTU.
+func TestResourceSizedPayloadThroughSmallMTUTunnel(t *testing.T) {
+	listener, err := raknet.Listen("127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	server := listener.Addr().(*net.UDPAddr)
+	proxy, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer proxy.Close()
+	var dropped atomic.Int32
+	go func() {
+		buf := make([]byte, 65536)
+		var client *net.UDPAddr
+		for {
+			n, from, err := proxy.ReadFromUDP(buf)
+			if err != nil {
+				return
+			}
+			if n > 1272 {
+				dropped.Add(1)
+				continue
+			}
+			if from.String() == server.String() {
+				if client != nil {
+					_, _ = proxy.WriteToUDP(buf[:n], client)
+				}
+			} else {
+				client = from
+				_, _ = proxy.WriteToUDP(buf[:n], server)
+			}
+		}
+	}()
+	payload := make([]byte, 64*1024)
+	if _, err := rand.Read(payload); err != nil {
+		t.Fatal(err)
+	}
+	sent := make(chan error, 1)
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			sent <- err
+			return
+		}
+		defer conn.Close()
+		_, err = conn.Write(payload)
+		sent <- err
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	network := webRakNet{logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	conn, err := network.DialContext(ctx, proxy.LocalAddr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	got := make([]byte, len(payload))
+	n, err := conn.Read(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got[:n], payload) {
+		t.Fatalf("payload mismatch: received %d bytes", n)
+	}
+	if err := <-sent; err != nil {
+		t.Fatal(err)
+	}
+	if dropped.Load() != 0 {
+		t.Fatalf("sent %d oversized datagrams", dropped.Load())
+	}
+}

@@ -2,7 +2,9 @@
 
 An experimental open-source browser client built on [go-test-bds](https://github.com/smell-of-curry/go-test-bds). A server-first launcher, a real Three.js Bedrock renderer, and a personal relay that translates browser actions into Bedrock client actions.
 
-**Status: experimental integration, not a complete Minecraft replacement.** Microsoft sign-in works. The first public PokéBedrock attempt was rejected by its VPN/proxy policy; after the user followed the server's Discord-linking flow, the hub explicitly accepted the account. That attempt stalled later in the handshake, before world entry. Packet-stage diagnostics and in-memory sign-in reuse now support further debugging. Gameplay remains unverified. A live RakNet probe on 2026-11-05 confirmed protocol 2225 / Bedrock 1.26.60, matching the client. No production protections were changed.
+**Status: live public-hub connection verified; still an experimental client, not a complete Minecraft replacement.** On 2026-11-05 the client signed in through Microsoft, joined `play.pokebedrock.com:19132`, downloaded its resources, and rendered the hub, players, terrain and HUD. Browser keyboard movement and looking changed the live player's position and rotation; releasing controls stopped movement. The target reported protocol 2225 / Bedrock 1.26.60, matching the client. Survival gameplay and navigation from the hub into other servers remain unverified.
+
+The server initially rejected this test network under its VPN/proxy policy; the account owner used the server's supported Discord-linking flow. A subsequent resource-pack stall was fixed by capping the client's RakNet MTU at 1200 (the test route's MTU was 1300). No server authentication or network protections were changed. A real transport regression test now verifies a 64 KiB payload across a simulated 1300-byte tunnel.
 
 `play.pokebedrock.com:19132` is the primary compatibility target. Public-server entries are experimental. The GitHub repository builds successfully and the launcher is live at https://smell-of-curry.github.io/bedrock-web/. The separate personal relay is still required to play.
 
@@ -47,11 +49,12 @@ GitHub Pages deployment uses `.github/workflows/pages.yml`. Select **GitHub Acti
 
 ## Controls and current limitations
 
-Click inside the world to lock the pointer. Escape releases it. Disconnect ends the Go process. The relay stays connected if you close the tab; use **Resume connection** on the home screen to return, or restart the relay to clear an abandoned session. Disconnect also cancels pending sign-in.
+Click inside the world to lock the pointer. Escape releases it. If the browser refuses pointer lock, keyboard mode enables WASD movement and arrow-key looking; Escape pauses it. Disconnect ends the Go process. The relay stays connected if you close the tab; use **Resume connection** on the home screen to return, or restart the relay to clear an abandoned session. Disconnect also cancels pending sign-in.
 
 This is not feature parity with Bedrock. Remaining work includes:
 
-- Real authenticated public-server compatibility tests; optional secure remembered sign-in and a user-controlled sign-out lifecycle.
+- Broader public-server compatibility tests beyond the verified PokéBedrock hub; optional secure remembered sign-in across relay restarts.
+- Server-navigation item use and transfer handling. The current public hub hotbar also exposes an upstream item-registry rendering mismatch: inventory inspection sees the items while the renderer shows empty slots.
 - Full survival/creative inventory interaction, crafting, combat and container screens.
 - Pixel-faithful native form hit-testing. Menu, modal and custom forms currently use a separate accessible interaction panel over the upstream renderer.
 - Touch/gamepad input, sound, accessibility and rendering/performance parity.
@@ -66,6 +69,7 @@ The underlying renderer also has its own limitations; consult `upstream/viewer/P
 
 ```sh
 npm test
+npm run test:network
 npm run build
 npm start
 ```
