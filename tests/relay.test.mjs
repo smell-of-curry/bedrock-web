@@ -44,6 +44,24 @@ test("relay protects control and rejects cross-origin writes", async () => {
     });
     assert.equal(invalid.status, 400);
     assert.match((await invalid.json()).error, /hostname/);
+    for (const headers of [
+      {},
+      { Origin: "https://attacker.example" },
+      { Host: "attacker.example:18080", Origin: "http://attacker.example:18080" },
+      { Origin: base, "Sec-Fetch-Site": "cross-site" },
+    ]) {
+      assert.equal((await fetch(base + "/api/local-session", { method: "POST", headers })).status, 403);
+    }
+    const paired = await fetch(base + "/api/local-session", {
+      method: "POST", headers: { Origin: base, "Sec-Fetch-Site": "same-origin" },
+    });
+    assert.equal(paired.status, 200);
+    const cookie = paired.headers.get("set-cookie");
+    assert.match(cookie, /HttpOnly; SameSite=Strict/);
+    const headers = { Cookie: cookie.split(";")[0], Origin: base };
+    assert.equal((await fetch(base + "/api/status", { method: "POST", headers })).status, 200);
+    assert.equal((await fetch(base + "/api/signout", { method: "POST", headers })).status, 200);
+    assert.equal((await fetch(base + "/api/status", { method: "POST", headers })).status, 401);
   } finally {
     if (child.exitCode === null) {
       const exited = once(child, "exit");

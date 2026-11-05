@@ -21,9 +21,9 @@ npm run build
 npm start
 ```
 
-Open `http://127.0.0.1:8080`. Copy the temporary relay key printed in the terminal into **Settings**, set your player name, then **Play → Add server**. Microsoft/Xbox sign-in is the default. Choose PokéBedrock or add a public server, press **Sign in & join**, then complete the displayed device-code flow on Microsoft’s website with your Minecraft account. The game uses your authenticated Xbox gamertag; the player-name setting is used only for offline test identities. For private tests only, select **Offline** in Settings and use a compatible BDS that already accepts unauthenticated clients. Do not disable production authentication.
+Open `http://127.0.0.1:8080`. The local client connects automatically; no access key is needed on this computer. Choose **Play → PokéBedrock → Sign in & join**, or **Add server** for another address. The GitHub Pages launcher also opens this local client when you choose a server; GitHub Pages itself cannot run the game service. Microsoft/Xbox sign-in is the default. Choose PokéBedrock or add a public server, press **Sign in & join**, then complete the displayed device-code flow on Microsoft’s website with your Minecraft account. The game uses your authenticated Xbox gamertag; the player-name setting is used only for offline test identities. For private tests only, select **Offline** in Settings and use a compatible BDS that already accepts unauthenticated clients. Do not disable production authentication.
 
-Sign-in access/refresh tokens travel over private child-process pipes and remain only in the personal relay’s memory. They are never persisted or returned to the browser. Reconnecting within the same relay session reuses sign-in; **Sign out of Microsoft** or restarting the relay clears it. The access key protects sign-in status and packet-stage diagnostics.
+Sign-in access/refresh tokens travel over private child-process pipes and remain only in the personal relay’s memory. They are never persisted or returned to the browser. Reconnecting within the same relay session reuses sign-in; **Sign out** or restarting the relay clears it. The home screen shows sign-in status; Sign out appears only while an account is signed in. Remote services require an access key. Local automatic pairing requires a same-origin request to a loopback-bound service, with an exact loopback Host check.
 
 The first connection downloads the upstream vanilla resource baseline into `.cache/`; packs supplied by the server are accepted. This can take time. No proprietary game assets are committed to this repository.
 
@@ -37,7 +37,7 @@ The first connection downloads the upstream vanilla resource baseline into `.cac
 - Interactive server menus, yes/no dialogs, and custom forms (text, toggle, slider, dropdown and step-slider fields), with resource-pack language support for RawText labels and descriptions.
 - Keyboard/mouse controls routed through the upstream instruction API: WASD, mouse look (arrow-key fallback), Space jump, Shift sneak, 1–9 hotbar, F use held item, T chat, left click break and right click use/place.
 - Authenticated server transfers and browser scene reload when the new world becomes ready.
-- Access-key authentication, same-origin write checks, bounded request bodies and restricted instruction names.
+- Automatic same-origin loopback pairing, access-key authentication for remote services, same-origin write checks, bounded request bodies and restricted instruction names.
 - GitHub Pages deployment workflow; Node tests and a reproducible build.
 
 ## Architecture and hosting

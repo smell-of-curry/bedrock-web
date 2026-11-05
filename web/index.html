@@ -18,8 +18,15 @@
         ><button id="settings">Settings</button
         ><button disabled>Marketplace <small>Unavailable</small></button>
         <button id="resume" hidden>Resume connection</button>
-        <button id="signout">Sign out of Microsoft</button>
+        <button id="signout" hidden>Sign out</button>
       </nav>
+      <p id="account-status" role="status">Checking connection…</p>
+      <div id="launcher-help" class="notice" hidden>
+        <b>Play on this computer</b>
+        <p>This website is the launcher. Open the local client, then choose Play → PokéBedrock → Sign in &amp; join.</p>
+        <a id="open-client" href="http://127.0.0.1:8080/">Open local client →</a>
+        <p>If it does not open, start Bedrock Web on your computer using the <a href="https://github.com/smell-of-curry/bedrock-web#run-locally">setup instructions</a>.</p>
+      </div>
       <div class="build">
         EXPERIMENTAL PREVIEW <b>0.1</b>
         <p>A real Bedrock connection. Powered by go-test-bds.</p>
@@ -62,8 +69,8 @@
             <div class="notice" id="support"></div>
             <h3>Before you jump in</h3>
             <p>
-              This preview connects through your personal relay. Server
-              resources and world data are rendered live using go-test-bds.
+              Select a server and press Join. Microsoft sign-in will appear
+              when needed. On the hosted launcher, Join opens the local client.
             </p>
             <div class="controls">
               <span><kbd>W A S D</kbd> Move</span
@@ -114,17 +121,17 @@
             required
             pattern="[a-zA-Z0-9_ ]{1,16}" /></label
         ><label
-          >Personal relay URL<input
+          >Game service address<input
             name="relay"
             type="url"
             placeholder="http://localhost:8080"
             required /></label
         ><label
-          >Relay access key<input name="key" type="password" autocomplete="off"
+          >Access key (remote service only)<input name="key" type="password" autocomplete="off"
         /></label>
         <p>
-          The key stays in this tab’s session storage. A GitHub Pages client
-          opens your relay to play.
+          On this computer, use http://127.0.0.1:8080 — no access key needed.
+          A remote service requires its access key. GitHub Pages is not a game service.
         </p>
         <label
           >Server authentication<select name="authentication">

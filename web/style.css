@@ -54,6 +54,9 @@ button small {
 [hidden] {
   display: none !important;
 }
+#account-status { max-width: 540px; text-align: center; line-height: 1.5; }
+#launcher-help { max-width: 540px; line-height: 1.5; margin: 12px 0; }
+#launcher-help a { color: #d6f1c6; font-weight: 700; }
 #landscape,
 .shade {
   position: fixed;

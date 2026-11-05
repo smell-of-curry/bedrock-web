@@ -1,5 +1,6 @@
 import { attachForms } from "./forms.js";
 import { loadLanguage, translateText } from "./text.js";
+import { connectionURL, initialConnection, readJSON } from "./connection.js";
 let stopForms = () => {};
 const $ = (id) => document.getElementById(id);
 function load(key, fallback) {
@@ -16,6 +17,8 @@ let settings = {
   authentication: "xbox",
   ...load("bw-settings", {}),
 };
+settings.relay = initialConnection(location.origin, settings.relay);
+let isRelay = false, localAccess = false, signedIn = false, connectionAttempt = 0;
 let saved = load("bw-servers", []);
 if (!Array.isArray(saved)) saved = [];
 let key = sessionStorage.getItem("bw-key") || "",
@@ -86,7 +89,9 @@ function select(s) {
       : "Uses Microsoft device-code sign-in. Compatibility with this server has not yet been verified."
     : "Microsoft sign-in is enabled by default. Use offline mode only for a private test server that explicitly supports it.";
   $("join").disabled = false;
-  $("join").textContent = s.auth ? "Sign in & join →" : "Join server →";
+  $("join").textContent = settings.relay !== location.origin
+    ? "Open client & join →"
+    : s.auth && !signedIn ? "Sign in & join →" : "Join server →";
   $("remove").hidden = !!s.auth;
 }
 function render() {
@@ -160,16 +165,12 @@ $("settings").onclick = showSettings;
 $("settings-form").onsubmit = (e) => {
   e.preventDefault();
   const f = new FormData(e.target);
-  const relay = new URL(f.get("relay"));
-  if (
-    !["http:", "https:"].includes(relay.protocol) ||
-    relay.username ||
-    relay.password
-  )
-    return toast("Relay must be an HTTP or HTTPS URL without credentials.");
+  let relay;
+  try { relay = connectionURL(f.get("relay")); }
+  catch (error) { return toast(error.message); }
   settings = {
     name: f.get("name"),
-    relay: relay.origin,
+    relay,
     sensitivity: Number(f.get("sensitivity")),
     authentication: f.get("authentication"),
   };
@@ -177,6 +178,8 @@ $("settings-form").onsubmit = (e) => {
   localStorage.setItem("bw-settings", JSON.stringify(settings));
   sessionStorage.setItem("bw-key", key);
   $("settings-dialog").close();
+  updateLauncher();
+  checkSession();
   toast("Settings saved");
 };
 for (const b of document.querySelectorAll("[data-close]"))
@@ -189,8 +192,8 @@ async function api(path, data) {
       Authorization: `Bearer ${key}`,
     },
     body: JSON.stringify(data),
-  });
-  const result = await r.json();
+  }).catch(() => { throw Error("The game service is unavailable. Start Bedrock Web on this computer, then try again."); });
+  const result = await readJSON(r);
   if (!r.ok || result.status === "error")
     throw Error(
       result.error || result.message || "The server rejected the action.",
@@ -209,13 +212,38 @@ function enterWorld(label) {
     "&camera=first";
 }
 async function checkSession() {
-  if (!key) return;
+  if (!isRelay) return;
   try {
     const state = await api("/api/status", {});
     $("resume").hidden = !state.connected;
-  } catch {
-    /* A Pages launcher has no relay routes. */
+    signedIn = state.signedIn;
+    $("signout").hidden = !signedIn;
+    $("account-status").textContent = signedIn
+      ? "Signed in with Microsoft. Choose Play to join a server."
+      : "Ready to play. Choose Play → PokéBedrock → Sign in & join.";
+    if (selected) select(selected);
+  } catch (error) {
+    $("account-status").textContent = error.message;
   }
+}
+function updateLauncher() {
+  $("launcher-help").hidden = isRelay;
+  $("open-client").href = settings.relay + "/";
+  if (!isRelay) $("account-status").textContent = "Choose Play to select a server, or open the local client below.";
+  if (selected) select(selected);
+}
+async function initialize() {
+  try {
+    const response = await fetch("/api/health");
+    isRelay = response.ok && (await readJSON(response)).relay === true;
+  } catch { isRelay = false; }
+  if (isRelay) {
+    settings.relay = location.origin;
+    try { await api("/api/local-session", {}); localAccess = true; }
+    catch { /* Remote services still require their access key. */ }
+    await checkSession();
+  }
+  updateLauncher();
 }
 $("resume").onclick = async () => {
   try {
@@ -226,6 +254,7 @@ $("resume").onclick = async () => {
   }
 };
 $("signout").onclick = async () => {
+  $("signout").disabled = true;
   try {
     await api("/api/signout", {});
     active = false;
@@ -234,18 +263,24 @@ $("signout").onclick = async () => {
     $("game").hidden = true;
     $("resume").hidden = true;
     $("home").hidden = false;
-    toast("Signed out of Microsoft");
+    $("servers").hidden = true;
+    signedIn = false;
+    $("signout").hidden = true;
+    localAccess = false;
+    try { await api("/api/local-session", {}); localAccess = true; } catch {}
+    $("account-status").textContent = "Signed out. Choose Play to sign in and join again.";
+    if (selected) select(selected);
+    toast("Signed out of Bedrock Web");
   } catch (e) {
     toast(e.message);
+  } finally {
+    $("signout").disabled = false;
   }
 };
-checkSession();
+const connectionReady = initialize();
 async function join() {
+  await connectionReady;
   if (!selected) return;
-  if (!key) {
-    showSettings();
-    return toast("Set your personal relay URL and access key first.");
-  }
   if (new URL(settings.relay).origin !== location.origin) {
     const transfer = { settings, key, server: selected };
     location.href =
@@ -254,6 +289,12 @@ async function join() {
       encodeURIComponent(JSON.stringify(transfer));
     return;
   }
+  if (!isRelay || (!key && !localAccess)) {
+    showSettings();
+    return toast(isRelay ? "Enter your remote service access key in Settings." : "Open the local client to play. GitHub Pages only hosts the launcher.");
+  }
+  const attempt = ++connectionAttempt;
+  $("join").disabled = true;
   $("game").hidden = false;
   $("game-status").textContent = "Connecting to " + selected.host + "…";
   $("leave").disabled = false;
@@ -261,6 +302,7 @@ async function join() {
   const statusPoll = setInterval(async () => {
     try {
       const status = await api("/api/status", {});
+      if (attempt !== connectionAttempt) return;
       $("sign-in").hidden = !status.challenge;
       if (status.challenge) {
         $("sign-in-code").textContent = status.challenge.code;
@@ -280,8 +322,9 @@ async function join() {
       name: settings.name,
       authentication: selected.auth ? "xbox" : settings.authentication,
     });
-    enterWorld(selected.label);
+    if (attempt === connectionAttempt) enterWorld(selected.label);
   } catch (e) {
+    if (attempt !== connectionAttempt) return;
     $("game").hidden = true;
     $("connection-error-message").textContent = e.message;
     $("connection-error").showModal();
@@ -289,11 +332,13 @@ async function join() {
     clearInterval(statusPoll);
     $("sign-in").hidden = true;
     $("leave").disabled = false;
+    await checkSession();
   }
 }
 $("join").onclick = join;
 $("leave").onclick = async () => {
   try {
+    ++connectionAttempt;
     await api("/api/disconnect", {});
     active = false;
     stopForms();
@@ -301,6 +346,8 @@ $("leave").onclick = async () => {
     $("world").src = "about:blank";
     $("game").hidden = true;
     $("home").hidden = false;
+    $("servers").hidden = true;
+    await checkSession();
   } catch (e) {
     toast(e.message);
   }

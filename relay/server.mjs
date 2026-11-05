@@ -85,6 +85,24 @@ const server = http.createServer(async (req, res) => {
       return json(res, 403, { error: "Cross-origin writes are disabled" });
     if (url.pathname === "/api/health")
       return json(res, 200, { relay: true, connected: !!session });
+    if (url.pathname === "/api/local-session" && req.method === "POST") {
+      // Pair only the UI served by this loopback-bound process. Exact Host and
+      // Origin checks prevent remote pages and DNS rebinding from pairing.
+      const loopback = ["127.0.0.1", "::1", "localhost"];
+      const localHosts = [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`];
+      if (!loopback.includes(host) ||
+          !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress) ||
+          !localHosts.includes(req.headers.host) ||
+          req.headers.origin !== `http://${req.headers.host}` ||
+          (req.headers["sec-fetch-site"] && req.headers["sec-fetch-site"] !== "same-origin"))
+        return json(res, 403, { error: "Automatic connection is available only from the local client on this computer." });
+      if (!auth) {
+        const cookie = randomBytes(24).toString("hex");
+        cookies.add(cookie);
+        res.setHeader("Set-Cookie", `bedrock=${cookie}; HttpOnly; SameSite=Strict; Path=/`);
+      }
+      return json(res, 200, { ok: true });
+    }
     if (url.pathname.startsWith("/api/") && !auth)
       return json(res, 401, {
         error: "Enter your relay access key in Settings.",
