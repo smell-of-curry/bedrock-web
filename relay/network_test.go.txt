@@ -13,34 +13,8 @@ import (
 
 	"github.com/sandertv/go-raknet"
 	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
-
-func TestHubItemUseCompatibility(t *testing.T) {
-	p := webProtocol{minecraft.DefaultProtocol}
-	for _, action := range []uint32{protocol.UseItemActionClickAir, protocol.UseItemActionClickBlock, protocol.UseItemActionBreakBlock} {
-		input := &packet.PlayerAuthInput{InputData: protocol.NewInputFlags(packet.InputFlagCount), ItemInteractionData: protocol.Option(protocol.UseItemTransactionData{ActionType: action})}
-		input.InputData.Set(packet.InputFlagPerformItemInteraction)
-		input.InputData.Set(packet.InputFlagJumpDown)
-		out := p.ConvertFromLatest(input, nil)[0].(*packet.PlayerAuthInput)
-		_, present := out.ItemInteractionData.Value()
-		want := action == protocol.UseItemActionBreakBlock
-		if present != want || out.InputData.Load(packet.InputFlagPerformItemInteraction) != want {
-			t.Fatalf("action %d interaction not adapted", action)
-		}
-		if !out.InputData.Load(packet.InputFlagJumpDown) {
-			t.Fatal("unrelated input changed")
-		}
-		if !input.InputData.Load(packet.InputFlagPerformItemInteraction) {
-			t.Fatal("adapter mutated caller flags")
-		}
-		transaction := &packet.InventoryTransaction{TransactionData: &protocol.UseItemTransactionData{ActionType: action}}
-		if p.ConvertFromLatest(transaction, nil)[0] != transaction {
-			t.Fatal("legacy transaction changed")
-		}
-	}
-}
 
 func TestTransferDestinationBoundaries(t *testing.T) {
 	for _, host := range []string{"127.0.0.1", "10.0.0.1", "192.168.1.1", "169.254.169.254", "::1", "fe80::1", "fc00::1", "0.0.0.0", "bad/host"} {

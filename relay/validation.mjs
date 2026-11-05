@@ -39,6 +39,8 @@ export const actions = new Set([
   "breakBlock",
   "interactWithBlock",
   "interact",
+  "attackEntity",
+  "interactWithEntity",
   "getState",
   "getInventory",
   "getForm",

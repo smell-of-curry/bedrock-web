@@ -65,6 +65,11 @@ res.end(JSON.stringify({bots:[{name:'FixtureGamertag',online:true}]}));}).listen
       action: "interact",
       path: "/bots/FixtureGamertag/instruction",
     });
+    for (const name of ["attackEntity", "interactWithEntity"]) {
+      assert.deepEqual((await api("action", { name, entityRuntimeID: 20 })).data, {
+        action: name, path: "/bots/FixtureGamertag/instruction",
+      });
+    }
     await api("disconnect");
     assert.equal((await api("status")).signedIn, true);
     await api("connect", { host: "localhost" });

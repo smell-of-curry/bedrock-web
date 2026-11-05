@@ -11,6 +11,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/smell-of-curry/go-test-bds/gotestbds"
+	"github.com/smell-of-curry/go-test-bds/gotestbds/actor"
 )
 
 type transferProtocol struct {
@@ -55,10 +56,11 @@ func publicTransferAddress(ctx context.Context, transfer *packet.Transfer) (stri
 func runWebSession(ctx context.Context, test *gotestbds.Test) error {
 	for redirects := 0; redirects <= 8; redirects++ {
 		transfers := make(chan *packet.Transfer, 1)
-		var base minecraft.Protocol = minecraft.DefaultProtocol
+		base := minecraft.DefaultProtocol
+		test.ItemInteractionTransport = actor.ItemInteractionAuthInput
 		host, port, _ := net.SplitHostPort(test.RemoteAddress)
 		if strings.EqualFold(strings.TrimSuffix(host, "."), "play.pokebedrock.com") && port == "19132" {
-			base = webProtocol{base}
+			test.ItemInteractionTransport = actor.ItemInteractionInventoryTransaction
 		}
 		test.Dialer.Protocol = transferProtocol{Protocol: base, transfers: transfers}
 		sessionCtx, cancel := context.WithCancel(ctx)

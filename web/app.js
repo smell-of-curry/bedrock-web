@@ -206,6 +206,7 @@ function enterWorld(label) {
   $("servers").hidden = true;
   $("game").hidden = false;
   $("game-status").textContent = label;
+  $("resource-status").textContent = "Loading resources…";
   $("world").src =
     "/renderer/index.html?stream=" +
     encodeURIComponent(location.origin + "/stream") +
@@ -358,6 +359,14 @@ $("world").onload = async () => {
     d = w.document,
     canvas = d.getElementById("c");
   if (!canvas) return;
+  fetch("/packs").then(readJSON).then((packs) => {
+    if (!active || w.document !== d) return;
+    const serverPacks = packs.filter((p) => p.id !== "vanilla");
+    $("resource-status").textContent = serverPacks.length
+      ? `Server resources loaded · ${serverPacks.reduce((n,p) => n + p.fileCount, 0)} files`
+      : "Vanilla resources loaded";
+    $("resource-status").title = packs.map((p) => `${p.name} (${p.version})`).join("\n");
+  }).catch(() => { $("resource-status").textContent = "Resource status unavailable"; });
   // The embedded renderer's diagnostic panel belongs to development tools.
   const overlay = d.getElementById("overlay");
   if (overlay) overlay.hidden = true;
@@ -460,6 +469,12 @@ $("world").onload = async () => {
       if (e.button === 2) send("interact").catch(error);
       return;
     }
+    if (hit.distance > 6) return;
+    if (hit.entityRuntimeID != null) {
+      const action = e.button === 0 ? "attackEntity" : e.button === 2 ? "interactWithEntity" : null;
+      if (action) send(action, { entityRuntimeID: hit.entityRuntimeID }).catch(error);
+      return;
+    }
     if (e.button === 0) send("breakBlock", { pos: hit.block }).catch(error);
     if (e.button === 2) {
       const distances = hit.point.flatMap((v, i) => [
@@ -497,7 +512,14 @@ $("world").onload = async () => {
         deltaRotation,
       });
     } catch (e) {
-      error(e);
+      // A busy server tick can reject a second input before simulating the
+      // first. Preserve look input for the next tick without flashing errors.
+      if (e.message === "unable to move") {
+        if (active && (d.pointerLockElement || keyboardMode)) {
+          dx += deltaRotation[0];
+          dy += deltaRotation[1];
+        }
+      } else error(e);
     } finally {
       busy = false;
     }

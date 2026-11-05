@@ -2,11 +2,11 @@
 
 An experimental open-source browser client built on [go-test-bds](https://github.com/smell-of-curry/go-test-bds). A server-first launcher, a real Three.js Bedrock renderer, and a personal relay that translates browser actions into Bedrock client actions.
 
-**Status: live public-server connection and transfer verified; still an experimental client, not a complete Minecraft replacement.** On 2026-11-05 the client signed in through Microsoft, joined `play.pokebedrock.com:19132`, downloaded its resources, and rendered the hub, players, terrain and HUD. Browser keyboard movement and looking changed the live player's position and rotation; releasing controls stopped movement. The Server Navigator and its confirmation worked; selecting Black (US) transferred the same authenticated session, downloaded the destination packs, and reached its welcome/tutorial menu. The target reported protocol 2225 / Bedrock 1.26.60, matching the client. The tutorial was not started. Survival gameplay remains unverified, and large destination scenes can render slowly or incompletely.
+**Status: live public-server connection and transfer verified; still an experimental client, not a complete Minecraft replacement.** On 2026-11-05 the client signed in through Microsoft, joined `play.pokebedrock.com:19132`, downloaded its resources, and rendered the hub, players, terrain and HUD. Browser keyboard movement and looking changed the live player's position and rotation; releasing controls stopped movement. Hotbar icons and custom NPC models now render, camera pitch follows Bedrock aim, and both browser mouse buttons opened Black's NPC join confirmation. The Server Navigator and its confirmation worked; selecting Black (US) transferred the same authenticated session, downloaded the destination packs, and reached its welcome/tutorial menu. The target reported protocol 2225 / Bedrock 1.26.60, matching the client. The tutorial was not started. Survival gameplay remains unverified, and large destination scenes can render slowly or incompletely.
 
 The server initially rejected this test network under its VPN/proxy policy; the account owner used the server's supported Discord-linking flow. A subsequent resource-pack stall was fixed by capping the client's RakNet MTU at 1200 (the test route's MTU was 1300). No server authentication or network protections were changed. A real transport regression test now verifies a 64 KiB payload across a simulated 1300-byte tunnel.
 
-The pinned upstream sends duplicate item interactions. PokéBedrock's Dragonfly hub rejects click-air/block actions in PlayerAuthInput, while accepting InventoryTransaction. A client adapter scoped to `play.pokebedrock.com:19132` removes those duplicate AuthInput actions. Other destinations retain upstream behavior pending its generic transport fix. Server-issued transfers reuse the authenticated client, reject private-network destinations, pin checked IP addresses, and stop after eight redirects.
+The upstream client sends each item interaction once. The relay selects the upstream inventory-transaction transport for the verified Dragonfly hub and auth-input transport for other destinations, including BDS. Server-issued transfers reuse the authenticated client, reject private-network destinations, pin checked IP addresses, and stop after eight redirects.
 
 `play.pokebedrock.com:19132` is the primary compatibility target. Public-server entries are experimental. The GitHub repository builds successfully and the launcher is live at https://smell-of-curry.github.io/bedrock-web/. The separate personal relay is still required to play.
 
@@ -32,10 +32,10 @@ The first connection downloads the upstream vanilla resource baseline into `.cac
 - Original voxel landscape, main menu and server-only Play screen.
 - Add/remove custom servers, persisted locally; player and relay settings.
 - A sample public-server directory led by PokéBedrock, with Microsoft device-code authentication.
-- Pinned upstream renderer: live chunks, entities, textures, HUD and resource packs.
+- Pinned upstream renderer: live chunks, entities, textures, HUD and resource packs. Hotbar icons resolve through the pack item atlas; NPC skins survive removal from the player list until despawn. Server boss-bar state is retained and displayed when sent.
 - Personal relay: real Go client startup, readiness polling, disconnect and process cleanup.
 - Interactive server menus, yes/no dialogs, and custom forms (text, toggle, slider, dropdown and step-slider fields), with resource-pack language support for RawText labels and descriptions.
-- Keyboard/mouse controls routed through the upstream instruction API: WASD, mouse look (arrow-key fallback), Space jump, Shift sneak, 1–9 hotbar, F use held item, T chat, left click break and right click use/place.
+- Keyboard/mouse controls routed through the upstream instruction API: WASD, mouse look (arrow-key fallback), Space jump, Shift sneak, 1–9 hotbar, F use held item, T chat, left click attack/break and right click interact/use/place.
 - Authenticated server transfers and browser scene reload when the new world becomes ready.
 - Automatic same-origin loopback pairing, access-key authentication for remote services, same-origin write checks, bounded request bodies and restricted instruction names.
 - GitHub Pages deployment workflow; Node tests and a reproducible build.
@@ -50,6 +50,8 @@ Configuration: `HOST` (default `127.0.0.1`), `PORT` (8080), `VIEWER_PORT` (8081)
 
 GitHub Pages deployment uses `.github/workflows/pages.yml`. Select **GitHub Actions** as the Pages build source. Pages hosts only the frontend; run the relay separately using the instructions above.
 
+The game header reports loaded server-resource file counts. The hub pack contains NPC models and menu artwork, not a custom HUD layout; its queue bar is sent only while queued. Boss-bar packet handling is regression-tested; the live test did not enter a queue.
+
 ## Controls and current limitations
 
 Click inside the world to lock the pointer. Escape releases it. If the browser refuses pointer lock, keyboard mode enables WASD movement and arrow-key looking; Escape pauses it. Disconnect ends the Go process. The relay stays connected if you close the tab; use **Resume connection** on the home screen to return, or restart the relay to clear an abandoned session. Disconnect also cancels pending sign-in.
@@ -57,7 +59,6 @@ Click inside the world to lock the pointer. Escape releases it. If the browser r
 This is not feature parity with Bedrock. Remaining work includes:
 
 - Broader public-server compatibility tests beyond the verified PokéBedrock hub; optional secure remembered sign-in across relay restarts.
-- The public hub hotbar exposes an upstream item-registry rendering mismatch: inventory inspection sees the items while the renderer shows empty slots. The default BDS interaction path also needs the upstream duplicate-input fix before repeated gameplay interaction is reliable.
 - Full survival/creative inventory interaction, crafting, combat and container screens.
 - Pixel-faithful native form hit-testing. Menu, modal and custom forms currently use a separate accessible interaction panel over the upstream renderer.
 - Touch/gamepad input, sound, accessibility and rendering/performance parity.
@@ -79,7 +80,7 @@ npm start
 
 `scripts/build-runner.mjs` copies upstream runner source into ignored `.build/runner/` and injects the authentication/transport hook plus `relay/session.go.txt` for transfers. It builds against the unmodified upstream module. Both injection anchors are checked and fail if an upstream change requires review. Upstream source is not modified or committed here. `npm run test:network` exercises real small-MTU transport, hub interaction encoding, and transfer destination checks.
 
-`upstream/` is a Git submodule pinned to `dc8476e`. Local uncommitted changes in another checkout are not included. Update the pin deliberately, then rebuild and retest the protocol, renderer and control API together. Build outputs, cache, logs and credentials are ignored.
+`upstream/` is a Git submodule pinned to `aa3c56f`. Local uncommitted changes in another checkout are not included. Update the pin deliberately, then rebuild and retest the protocol, renderer and control API together. Build outputs, cache, logs and credentials are ignored.
 
 The pinned upstream build currently reports three high-severity development-dependency audit findings (Vite, nanoid and source-map-js). These are not dependencies of the Node relay; the hosted frontend is a static production bundle. Do not expose the upstream Vite development server. Updating the upstream build-tool pin and rerunning its suite remains outstanding.
 

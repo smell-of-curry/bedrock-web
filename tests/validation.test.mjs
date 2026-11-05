@@ -23,6 +23,8 @@ test("rejects malformed targets and injection-shaped inputs", () => {
 });
 test("control API restricts arbitrary upstream instructions", () => {
   assert(actions.has("moveRawInput"));
+  assert(actions.has("attackEntity"));
+  assert(actions.has("interactWithEntity"));
   assert(!actions.has("command"));
   assert(!actions.has("eval"));
 });

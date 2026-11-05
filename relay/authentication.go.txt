@@ -8,13 +8,11 @@ import (
 	"log/slog"
 	"net"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/sandertv/go-raknet"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"golang.org/x/oauth2"
 )
@@ -57,33 +55,7 @@ func (s *webTokenSource) Token() (*oauth2.Token, error) {
 	return token, nil
 }
 
-// The public PokéBedrock hub uses Dragonfly, which accepts click-air/block in
-// InventoryTransaction but rejects those duplicates in PlayerAuthInput. BDS
-// needs the latter, so this compatibility rule is scoped to the verified hub.
-type webProtocol struct{ minecraft.Protocol }
-
-func (p webProtocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []packet.Packet {
-	if input, ok := pk.(*packet.PlayerAuthInput); ok {
-		if action, present := input.ItemInteractionData.Value(); present && action.ActionType != protocol.UseItemActionBreakBlock {
-			copy := *input
-			copy.InputData = protocol.NewInputFlags(input.InputData.Len())
-			for i := 0; i < input.InputData.Len(); i++ {
-				if input.InputData.Load(i) {
-					copy.InputData.Set(i)
-				}
-			}
-			copy.InputData.Unset(packet.InputFlagPerformItemInteraction)
-			copy.ItemInteractionData = protocol.Optional[protocol.UseItemTransactionData]{}
-			return p.Protocol.ConvertFromLatest(&copy, conn)
-		}
-	}
-	return p.Protocol.ConvertFromLatest(pk, conn)
-}
 func configureWebAuthentication(ctx context.Context, dialer *minecraft.Dialer, address string) error {
-	host, port, _ := net.SplitHostPort(address)
-	if strings.EqualFold(strings.TrimSuffix(host, "."), "play.pokebedrock.com") && port == "19132" {
-		dialer.Protocol = webProtocol{minecraft.DefaultProtocol}
-	}
 	// Record packet identifiers once per direction. No packet payload is read.
 	seen := map[string]bool{}
 	var traceMu sync.Mutex

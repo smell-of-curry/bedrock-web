@@ -26,6 +26,9 @@ jobs:
           cache-dependency-path: upstream/go.sum
       - run: npm test
       - run: npm run build
+      - run: go test -C upstream ./gotestbds/actor ./gotestbds/bot ./gotestbds/viewer
+      - run: ./node_modules/.bin/tsx --test src/camera-look.test.ts src/entity/itemIcons.test.ts
+        working-directory: upstream/viewer
       - run: go test -C .build/runner -timeout=30s .
       - uses: actions/upload-pages-artifact@v3
         with:
