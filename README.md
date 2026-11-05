@@ -2,7 +2,9 @@
 
 An experimental open-source browser client built on [go-test-bds](https://github.com/smell-of-curry/go-test-bds). A server-first launcher, a real Three.js Bedrock renderer, and a personal relay that translates browser actions into Bedrock client actions.
 
-**Status: early playable-client integration, not a complete Minecraft replacement.** The shell and relay have automated checks; gameplay has not yet been verified against a live Bedrock server. Microsoft device-code sign-in is implemented and has reached a real Microsoft challenge. Microsoft sign-in succeeded in the live test, but PokéBedrock rejected the relay network with its VPN/proxy policy before spawn. The server asks affected accounts to link Discord using `/link`. No server protections were changed; world entry and gameplay remain unverified. A live RakNet probe on 2026-11-05 confirmed the target advertises protocol 2225 / Bedrock 1.26.60, matching the pinned client library. Public-server entries are experimental; `play.pokebedrock.com:19132` is the primary compatibility target.
+**Status: experimental integration, not a complete Minecraft replacement.** Microsoft sign-in works. The first public PokéBedrock attempt was rejected by its VPN/proxy policy; after the user followed the server's Discord-linking flow, the hub explicitly accepted the account. That attempt stalled later in the handshake, before world entry. Packet-stage diagnostics and in-memory sign-in reuse now support further debugging. Gameplay remains unverified. A live RakNet probe on 2026-11-05 confirmed protocol 2225 / Bedrock 1.26.60, matching the client. No production protections were changed.
+
+`play.pokebedrock.com:19132` is the primary compatibility target. Public-server entries are experimental. The GitHub repository builds successfully; Pages publication is currently blocked by a stale deployment lock reported by GitHub despite cancellation and configuration reset.
 
 ## Run locally
 
@@ -17,7 +19,7 @@ npm start
 
 Open `http://127.0.0.1:8080`. Copy the temporary relay key printed in the terminal into **Settings**, set your player name, then **Play → Add server**. Microsoft/Xbox sign-in is the default. Choose PokéBedrock or add a public server, press **Sign in & join**, then complete the displayed device-code flow on Microsoft’s website with your Minecraft account. The game uses your authenticated Xbox gamertag; the player-name setting is used only for offline test identities. For private tests only, select **Offline** in Settings and use a compatible BDS that already accepts unauthenticated clients. Do not disable production authentication.
 
-The sign-in access/refresh tokens stay in the Go child process; they are not persisted or returned to the browser. A fresh connection currently requires sign-in again. The access key protects the device-code status endpoint.
+Sign-in access/refresh tokens travel over private child-process pipes and remain only in the personal relay’s memory. They are never persisted or returned to the browser. Reconnecting within the same relay session reuses sign-in; **Sign out of Microsoft** or restarting the relay clears it. The access key protects sign-in status and packet-stage diagnostics.
 
 The first connection downloads the upstream vanilla resource baseline into `.cache/`; packs supplied by the server are accepted. This can take time. No proprietary game assets are committed to this repository.
 
@@ -70,7 +72,7 @@ npm start
 
 `scripts/build-runner.mjs` copies only upstream runner source into ignored `.build/runner/` and injects the small `relay/authentication.go.txt` hook. It builds against the unmodified upstream module. The injection checks its anchor and fails if an upstream change requires review. Upstream source is not modified or committed here.
 
-`upstream/` is a Git submodule pinned to `2484855c74e36076317beaf511982a922162ae1b`. Local uncommitted changes in another checkout are not included. Update the pin deliberately, then rebuild and retest the protocol, renderer and control API together. Build outputs, cache, logs and credentials are ignored.
+`upstream/` is a Git submodule pinned to `dc8476e`. Local uncommitted changes in another checkout are not included. Update the pin deliberately, then rebuild and retest the protocol, renderer and control API together. Build outputs, cache, logs and credentials are ignored.
 
 The pinned upstream build currently reports three high-severity development-dependency audit findings (Vite, nanoid and source-map-js). These are not dependencies of the Node relay; the hosted frontend is a static production bundle. Do not expose the upstream Vite development server. Updating the upstream build-tool pin and rerunning its suite remains outstanding.
 

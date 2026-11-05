@@ -12,6 +12,7 @@ const root = resolve(import.meta.dirname, ".."),
 const token = process.env.RELAY_TOKEN || randomBytes(24).toString("hex");
 const viewerPort = Number(process.env.VIEWER_PORT || 8081),
   controlPort = Number(process.env.CONTROL_PORT || 8082);
+let cachedAccountToken = null;
 let session = null,
   connecting = false;
 const cookies = new Set();
@@ -93,7 +94,15 @@ const server = http.createServer(async (req, res) => {
         connecting,
         connected: !!session && !connecting,
         challenge: session?.challenge || null,
+        trace: session?.trace || [],
+        signedIn: !!cachedAccountToken,
       });
+    if (url.pathname === "/api/signout" && req.method === "POST") {
+      await stop();
+      cachedAccountToken = null;
+      cookies.clear();
+      return json(res, 200, { ok: true });
+    }
     if (url.pathname === "/api/resume" && req.method === "POST") {
       if (!session || connecting)
         return json(res, 409, {
@@ -139,18 +148,53 @@ const server = http.createServer(async (req, res) => {
         ];
         const child = spawn(resolve(root, ".build/gotestbds"), args, {
           cwd: dir,
-          stdio: ["ignore", "pipe", "pipe"],
+          stdio: ["pipe", "pipe", "pipe", "pipe"],
           env: {
             ...process.env,
             GOTESTBDS_CONTROL_TOKEN: "",
             BEDROCK_WEB_AUTH: t.authentication,
           },
         });
+        child.stdin.on("error", () => {});
+        child.stdin.end(
+          JSON.stringify(
+            t.authentication === "xbox" ? cachedAccountToken : null,
+          ),
+        );
+        let tokenBuffer = "";
+        child.stdio[3].on("data", (b) => {
+          tokenBuffer += b;
+          if (tokenBuffer.length > 65536) {
+            child.kill("SIGTERM");
+            tokenBuffer = "";
+            return;
+          }
+          let newline;
+          while ((newline = tokenBuffer.indexOf("\n")) !== -1) {
+            const line = tokenBuffer.slice(0, newline);
+            tokenBuffer = tokenBuffer.slice(newline + 1);
+            try {
+              const token = JSON.parse(line);
+              if (
+                typeof token.access_token === "string" &&
+                session?.child === child
+              )
+                cachedAccountToken = token;
+            } catch {
+              child.kill("SIGTERM");
+            }
+          }
+        });
         let log = "",
           failure = "";
         for (const s of [child.stdout, child.stderr])
           s.on("data", (b) => {
-            log = (log + b).slice(-3000);
+            log = (log + b).slice(-6000);
+            if (session?.child === child)
+              session.trace = log
+                .split("\n")
+                .filter((line) => line.startsWith("[BEDROCK_PACKET]"))
+                .slice(-40);
             const match = log.match(
               /Authenticate at (https:\/\/[^\s]+) using the code ([A-Z0-9-]+)\./,
             );

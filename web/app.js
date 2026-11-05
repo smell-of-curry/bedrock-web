@@ -220,6 +220,19 @@ $("resume").onclick = async () => {
     toast(e.message);
   }
 };
+$("signout").onclick = async () => {
+  try {
+    await api("/api/signout", {});
+    active = false;
+    stopForms();
+    $("world").src = "about:blank";
+    $("game").hidden = true;
+    $("resume").hidden = true;
+    toast("Signed out of Microsoft");
+  } catch (e) {
+    toast(e.message);
+  }
+};
 checkSession();
 async function join() {
   if (!selected) return;
@@ -247,6 +260,8 @@ async function join() {
         $("sign-in-code").textContent = status.challenge.code;
         $("sign-in-link").href = status.challenge.url;
         $("game-status").textContent = "Waiting for Microsoft sign-in…";
+      } else {
+        $("game-status").textContent = "Connecting to " + selected.host + "…";
       }
     } catch {
       /* The connect request reports the final error. */

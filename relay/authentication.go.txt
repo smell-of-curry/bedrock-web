@@ -2,20 +2,54 @@ package main
 
 import (
     "context"
+    "encoding/json"
+    "fmt"
     "io"
+    "net"
     "os"
+    "sync"
 
     "github.com/sandertv/gophertunnel/minecraft"
     "github.com/sandertv/gophertunnel/minecraft/auth"
+    "github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+    "golang.org/x/oauth2"
 )
 
-// configureWebAuthentication adds an opt-in authenticated identity to the
-// upstream test runner. Tokens stay in this child process and are never saved
-// to disk or sent to the browser. The user completes Microsoft's device flow.
+// Tokens travel only over inherited private pipes to the personal relay. They
+// are never printed, persisted, included in packet traces, or sent to browsers.
+type webTokenSource struct {
+    source oauth2.TokenSource
+    output *os.File
+    mu sync.Mutex
+}
+func (s *webTokenSource) Token() (*oauth2.Token, error) {
+    s.mu.Lock(); defer s.mu.Unlock()
+    token, err := s.source.Token()
+    if err != nil { return nil, err }
+    if err := json.NewEncoder(s.output).Encode(token); err != nil { return nil, fmt.Errorf("save session to relay: %w", err) }
+    return token, nil
+}
 func configureWebAuthentication(ctx context.Context, dialer *minecraft.Dialer) error {
+    // Record packet identifiers once per direction. No packet payload is read.
+    seen := map[string]bool{}
+    var traceMu sync.Mutex
+    dialer.PacketFunc = func(h packet.Header, _ []byte, src, dst net.Addr) {
+        traceMu.Lock(); defer traceMu.Unlock()
+        marker := fmt.Sprintf("id=%d src=%s dst=%s", h.PacketID, src.String(), dst.String())
+        if !seen[marker] { seen[marker] = true; fmt.Fprintln(os.Stdout, "[BEDROCK_PACKET]", marker) }
+    }
+    dialer.ClientData.DeviceModel = "Bedrock Web"
     if os.Getenv("BEDROCK_WEB_AUTH") != "xbox" { return nil }
-    token, err := auth.RequestLiveTokenContext(ctx, os.Stdout)
-    if err != nil { return err }
-    dialer.TokenSource = auth.RefreshTokenSourceWriter(token, io.Discard)
+    var cached *oauth2.Token
+    if err := json.NewDecoder(io.LimitReader(os.Stdin, 65536)).Decode(&cached); err != nil && err != io.EOF { return fmt.Errorf("read relay session: %w", err) }
+    var token *oauth2.Token
+    if cached != nil { token, _ = auth.RefreshTokenSourceWriter(cached, io.Discard).Token() }
+    if token == nil {
+        var err error
+        token, err = auth.RequestLiveTokenContext(ctx, os.Stdout)
+        if err != nil { return err }
+    } else { fmt.Fprintln(os.Stdout, "Authentication successful.") }
+    output := os.NewFile(3, "relay-session")
+    dialer.TokenSource = &webTokenSource{source: auth.RefreshTokenSourceWriter(token, io.Discard), output: output}
     return nil
 }
