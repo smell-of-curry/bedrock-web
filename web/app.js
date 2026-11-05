@@ -1,4 +1,5 @@
 import { attachForms } from "./forms.js";
+import { loadLanguage, translateText } from "./text.js";
 let stopForms = () => {};
 const $ = (id) => document.getElementById(id);
 function load(key, fallback) {
@@ -80,7 +81,9 @@ function select(s) {
     s.description ||
     "Connect to your own Bedrock Dedicated Server and explore its live world in your browser.";
   $("support").textContent = s.auth
-    ? "Uses Microsoft device-code sign-in. Public-server compatibility is experimental and has not yet been verified."
+    ? s.host === "play.pokebedrock.com"
+      ? "Microsoft sign-in, hub movement and server navigation have been tested. Gameplay compatibility is still experimental."
+      : "Uses Microsoft device-code sign-in. Compatibility with this server has not yet been verified."
     : "Microsoft sign-in is enabled by default. Use offline mode only for a private test server that explicitly supports it.";
   $("join").disabled = false;
   $("join").textContent = s.auth ? "Sign in & join →" : "Join server →";
@@ -302,7 +305,7 @@ $("leave").onclick = async () => {
     toast(e.message);
   }
 };
-$("world").onload = () => {
+$("world").onload = async () => {
   if (!active) return;
   const w = $("world").contentWindow,
     d = w.document,
@@ -318,15 +321,44 @@ $("world").onload = () => {
     keyboardMode = false;
   const send = (name, args = {}) => api("/api/action", { name, ...args });
   const error = (e) => toast(e.message);
+  const sessionLabel = $("game-status").textContent;
+  let transferring = false;
+  const language = await loadLanguage().catch(() => ({}));
+  if (!active || w.document !== d) return;
   stopForms();
   stopForms = attachForms({
     host: $("server-form-panel"),
     send,
+    details: () => w.__viewerInternals?.store.getState().ui?.form,
+    localize: (value) => translateText(value, language),
+    onVisibility: (visible) => { const native = d.getElementById("json-hud"); if (native) native.style.visibility = visible ? "hidden" : ""; },
     releasePointer: () => {
       d.exitPointerLock();
       reset();
     },
-    onError: error,
+    onReady: () => {
+      $("game-status").textContent = sessionLabel;
+      if (transferring) {
+        transferring = false;
+        $("world").src = $("world").src;
+      }
+    },
+    onError: (e) => {
+      if (e.message === "unknown bot") {
+        transferring = true;
+        $("game-status").textContent = "Loading destination world…";
+        reset();
+      } else if (e.message === "No active session") {
+        active = false;
+        stopForms();
+        $("world").src = "about:blank";
+        $("game").hidden = true;
+        $("home").hidden = false;
+        $("resume").hidden = true;
+        $("connection-error-message").textContent = "The server connection ended. Your Microsoft sign-in remains available for another attempt.";
+        $("connection-error").showModal();
+      } else error(e);
+    },
   });
   const reset = () => {
     keys.clear();
@@ -357,6 +389,7 @@ $("world").onload = () => {
     if (!d.pointerLockElement && !keyboardMode) return;
     e.preventDefault();
     keys.add(e.code);
+    if (e.code === "KeyF" && !e.repeat) send("interact").catch(error);
     if (e.code === "Space" && !e.repeat) send("jump").catch(error);
     if (/^Digit[1-9]$/.test(e.code))
       send("setHeldSlot", { slot: Number(e.code.slice(-1)) - 1 }).catch(error);
@@ -367,7 +400,7 @@ $("world").onload = () => {
     if (!d.pointerLockElement && !keyboardMode) {
       const fallback = () => {
         keyboardMode = true;
-        $("game-help").textContent = "Keyboard mode · WASD move · Arrow keys look · Space jump · 1–9 hotbar · T chat · Escape pause";
+        $("game-help").textContent = "Keyboard mode · WASD move · Arrows look · Space jump · 1–9 hotbar · F use item · T chat · Escape pause";
       };
       try { canvas.requestPointerLock()?.catch(fallback); } catch { fallback(); }
       return;
@@ -376,7 +409,10 @@ $("world").onload = () => {
       canvas.clientWidth / 2,
       canvas.clientHeight / 2,
     );
-    if (!hit) return;
+    if (!hit) {
+      if (e.button === 2) send("interact").catch(error);
+      return;
+    }
     if (e.button === 0) send("breakBlock", { pos: hit.block }).catch(error);
     if (e.button === 2) {
       const distances = hit.point.flatMap((v, i) => [

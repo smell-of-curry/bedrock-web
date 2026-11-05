@@ -17,7 +17,9 @@ const token=JSON.parse(input);
 fs.writeSync(3,JSON.stringify({access_token:'TEST-ONLY-SECRET',refresh_token:'TEST-ONLY-REFRESH'})+'\\n');
 console.log('[BEDROCK_PACKET] id='+ (token?2:1));
 const port=Number(process.argv[process.argv.indexOf('--control')+1].split(':').pop());
-http.createServer((req,res)=>{res.setHeader('Content-Type','application/json');res.end(JSON.stringify({bots:[{name:'FixtureGamertag',online:true}]}));}).listen(port,'127.0.0.1');
+http.createServer(async(req,res)=>{res.setHeader('Content-Type','application/json');
+if(req.method==='POST'){let body='';for await(const part of req)body+=part;res.end(JSON.stringify({status:'success',data:{action:JSON.parse(body).name,path:req.url}}));return;}
+res.end(JSON.stringify({bots:[{name:'FixtureGamertag',online:true}]}));}).listen(port,'127.0.0.1');
 `,
     { mode: 0o700 },
   );
@@ -59,6 +61,10 @@ http.createServer((req,res)=>{res.setHeader('Content-Type','application/json');r
     assert.equal(status.signedIn, true);
     assert(!JSON.stringify(status).includes("TEST-ONLY"));
     assert(status.trace.some((t) => t.includes("id=1")));
+    assert.deepEqual((await api("action", { name: "interact" })).data, {
+      action: "interact",
+      path: "/bots/FixtureGamertag/instruction",
+    });
     await api("disconnect");
     assert.equal((await api("status")).signedIn, true);
     await api("connect", { host: "localhost" });

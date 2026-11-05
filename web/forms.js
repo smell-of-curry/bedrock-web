@@ -1,10 +1,13 @@
 /** Accessible interaction surface for server forms while native JSON UI is rendered by upstream. */
-export function attachForms({ host, send, releasePointer, onError }) {
+export function attachForms({ host, send, releasePointer, onError, onReady = () => {}, onVisibility = () => {}, details = () => null, localize = (value) => String(value ?? "") }) {
   let stopped = false,
     busy = false,
     current = "",
     submitting = false;
-  const clean = (value) => String(value ?? "").replace(/§./g, "");
+  const clean = (value) => {
+    const text = localize(value).replace(/§./g, "");
+    return ({ "gui.yes": "Yes", "gui.no": "No", "gui.ok": "OK", "gui.cancel": "Cancel" })[text] ?? text;
+  };
   function element(tag, text) {
     const el = document.createElement(tag);
     if (text !== undefined) el.textContent = clean(text);
@@ -18,6 +21,7 @@ export function attachForms({ host, send, releasePointer, onError }) {
       await send(name, args);
       current = "";
       host.hidden = true;
+      onVisibility(false);
     } catch (e) {
       onError(e);
       for (const b of host.querySelectorAll("button")) b.disabled = false;
@@ -35,7 +39,9 @@ export function attachForms({ host, send, releasePointer, onError }) {
     releasePointer();
     host.replaceChildren();
     host.hidden = false;
+    onVisibility(true);
     host.append(element("h2", form.title || "Server menu"));
+    if (form.body) host.append(element("p", form.body));
     if (form.type === "menu")
       form.buttons?.forEach((b, index) =>
         host.append(button(b.text, "clickFormButton", { index })),
@@ -109,12 +115,16 @@ export function attachForms({ host, send, releasePointer, onError }) {
     try {
       const result = await send("getForm");
       if (stopped) return;
-      const form = result.data;
+      onReady();
+      let form = result.data;
+      const rendered = details();
+      if (form && form.type !== "custom" && rendered && clean(rendered.title) === clean(form.title) && rendered.type === form.type)
+        form = { ...form, body: rendered.content };
       const next = form ? JSON.stringify(form) : "";
       if (next !== current) {
         current = next;
         if (form) render(form);
-        else host.hidden = true;
+        else { host.hidden = true; onVisibility(false); }
       }
     } catch (e) {
       if (!stopped) onError(e);
@@ -128,6 +138,7 @@ export function attachForms({ host, send, releasePointer, onError }) {
     stopped = true;
     clearInterval(timer);
     host.hidden = true;
+    onVisibility(false);
     host.replaceChildren();
   };
 }

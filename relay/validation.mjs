@@ -38,6 +38,7 @@ export const actions = new Set([
   "chat",
   "breakBlock",
   "interactWithBlock",
+  "interact",
   "getState",
   "getInventory",
   "getForm",

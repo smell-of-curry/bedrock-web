@@ -21,15 +21,19 @@ if (main.split(anchor).length !== 2)
   );
 main = main.replace(
   anchor,
-  "\tif err := configureWebAuthentication(ctx, &dialer); err != nil { return err }\n" +
+  "\tif err := configureWebAuthentication(ctx, &dialer, config.Network.ServerAddress); err != nil { return err }\n" +
     anchor,
 );
+const runAnchor = "\terr := test.RunCtx(ctx)";
+if (main.split(runAnchor).length !== 2) throw Error("Upstream session entry changed: review transfer handling.");
+main = main.replace(runAnchor, "\terr := runWebSession(ctx, test)");
 await writeFile(resolve(dir, "main.go"), main);
 await cp(
   resolve(root, "relay/authentication.go.txt"),
   resolve(dir, "web_authentication.go"),
 );
 await cp(resolve(root, "relay/network_test.go.txt"), resolve(dir, "web_network_test.go"));
+await cp(resolve(root, "relay/session.go.txt"), resolve(dir, "web_session.go"));
 let mod = await readFile(resolve(dir, "go.mod"), "utf8");
 mod = mod.replace(
   "module github.com/smell-of-curry/go-test-bds",
@@ -44,5 +48,5 @@ execFileSync(
   { cwd: dir, stdio: "inherit" },
 );
 if (process.argv.includes("--test")) {
-  execFileSync("go", ["test", "-mod=mod", "-timeout=30s", "-run", "TestResourceSizedPayload", "."], { cwd: dir, stdio: "inherit" });
+  execFileSync("go", ["test", "-mod=mod", "-timeout=30s", "."], { cwd: dir, stdio: "inherit" });
 }

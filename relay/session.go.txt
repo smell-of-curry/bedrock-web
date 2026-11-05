@@ -1,0 +1,99 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/smell-of-curry/go-test-bds/gotestbds"
+)
+
+type transferProtocol struct {
+	minecraft.Protocol
+	transfers chan *packet.Transfer
+}
+
+func (p transferProtocol) ConvertToLatest(pk packet.Packet, conn *minecraft.Conn) []packet.Packet {
+	if transfer, ok := pk.(*packet.Transfer); ok {
+		copy := *transfer
+		select {
+		case p.transfers <- &copy:
+		default:
+		}
+	}
+	return p.Protocol.ConvertToLatest(pk, conn)
+}
+
+// Redirects from an untrusted server may only reach public network addresses.
+// A user can still explicitly choose a private server in the launcher.
+func publicTransferAddress(ctx context.Context, transfer *packet.Transfer) (string, error) {
+	host := strings.TrimSuffix(strings.TrimSpace(transfer.Address), ".")
+	if host == "" || transfer.Port == 0 || len(host) > 253 || strings.ContainsAny(host, "/\\@ \t\r\n") {
+		return "", fmt.Errorf("server supplied an invalid transfer destination")
+	}
+	lookupCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	addresses, err := net.DefaultResolver.LookupIPAddr(lookupCtx, host)
+	if err != nil || len(addresses) == 0 {
+		return "", fmt.Errorf("cannot resolve server transfer destination")
+	}
+	for _, address := range addresses {
+		ip := address.IP
+		if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+			return "", fmt.Errorf("server transfer to a private network is not allowed")
+		}
+	}
+	// Pin the checked address: do not resolve the hostname again when dialing.
+	return net.JoinHostPort(addresses[0].IP.String(), strconv.Itoa(int(transfer.Port))), nil
+}
+
+func runWebSession(ctx context.Context, test *gotestbds.Test) error {
+	for redirects := 0; redirects <= 8; redirects++ {
+		transfers := make(chan *packet.Transfer, 1)
+		var base minecraft.Protocol = minecraft.DefaultProtocol
+		host, port, _ := net.SplitHostPort(test.RemoteAddress)
+		if strings.EqualFold(strings.TrimSuffix(host, "."), "play.pokebedrock.com") && port == "19132" {
+			base = webProtocol{base}
+		}
+		test.Dialer.Protocol = transferProtocol{Protocol: base, transfers: transfers}
+		sessionCtx, cancel := context.WithCancel(ctx)
+		done := make(chan error, 1)
+		go func() { done <- test.RunCtx(sessionCtx) }()
+		var transfer *packet.Transfer
+		var finished bool
+		select {
+		case transfer = <-transfers:
+		case err := <-done:
+			finished = true
+			select {
+			case transfer = <-transfers:
+			default:
+				cancel()
+				return err
+			}
+		case <-ctx.Done():
+			cancel()
+			return ctx.Err()
+		}
+		cancel()
+		if !finished {
+			select {
+			case <-done:
+			case <-time.After(15 * time.Second):
+				return fmt.Errorf("previous server did not close during transfer")
+			}
+		}
+		address, err := publicTransferAddress(ctx, transfer)
+		if err != nil {
+			return err
+		}
+		test.Logger.Info("following server transfer", "address", address)
+		test.RemoteAddress = address
+	}
+	return fmt.Errorf("server transfer limit exceeded")
+}

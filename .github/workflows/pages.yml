@@ -26,7 +26,7 @@ jobs:
           cache-dependency-path: upstream/go.sum
       - run: npm test
       - run: npm run build
-      - run: go test -C .build/runner -timeout=30s -run TestResourceSizedPayload .
+      - run: go test -C .build/runner -timeout=30s .
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
